@@ -23,7 +23,6 @@ async def listen_for_messages():
     await asyncio.sleep(1)  # Allow broker time to start
     client = MQTTClient()
     await client.connect('mqtt://127.0.0.1:1883/')
-    # '#' subscribes to all topics
     await client.subscribe([('#', 0)])
     print("[Listener] Subscribed to all topics. Waiting for incoming data...\n")
     
@@ -38,8 +37,6 @@ async def main():
     broker = Broker(config)
     await broker.start()
     print("MQTT Broker running on port 1883...")
-    
-    # Start the subscriber task in the background
     asyncio.create_task(listen_for_messages())
     
     while True:

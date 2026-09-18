@@ -2,4 +2,4 @@ This is the program that is injected to the esp32, that allows the esp to contac
 
 ### IMPORTANT ###
 
-You need to change the CLIENT ID, for each ESP 32 as it is unique 
+You need to change the CLIENT ID, for each ESP 32 as it is unique and the message can change for each MQTT that is sent to the database

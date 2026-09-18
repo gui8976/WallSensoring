@@ -3,7 +3,7 @@ import time
 import paho.mqtt.client as mqtt
 
 # --- Configuration ---
-BROKER_IP   = "127.0.0.1"  # "localhost" if the broker script runs on the same Pi 5
+BROKER_IP   = "127.0.0.1"  # "localhost" if the broker script runs on the same Pi 5 ( it usually does )
 BROKER_PORT = 1883
 MQTT_TOPIC  = "esp32/sensors"
 
@@ -26,11 +26,7 @@ def on_message(client, userdata, msg):
     try:
         # 1. Decode raw byte payload into a UTF-8 string
         raw_payload = msg.payload.decode("utf-8")
-
-        # 2. Parse the JSON string into a Python dictionary
         decoded_data = json.loads(raw_payload)
-
-        # 3. Store the dictionary in our array (list)
         sensor_data_history.append(decoded_data)
 
         # 4. Print live confirmation and total array size
@@ -48,7 +44,7 @@ def on_message(client, userdata, msg):
 
 
 # --- Setup Paho MQTT Client ---
-# Using MQTTv5 API / Callback API v2 compatible structure
+# Using MQTT
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="RaspberryPi5_Subscriber")
 client.on_connect = on_connect
 client.on_message = on_message
