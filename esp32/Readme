@@ -1,0 +1,5 @@
+This is the program that is injected to the esp32, that allows the esp to contact rasp5 via MQTT and then the information is captured is stored in a database that identifies the sensor and creats an entry with all the values.
+
+### IMPORTANT ###
+
+You need to change the CLIENT ID, for each ESP 32 as it is unique 
