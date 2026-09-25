@@ -12,7 +12,7 @@ Lightweight SHM pipeline for a wall: ESP32 nodes collect temperature, humidity, 
 ```
  
 - **Bottom:** ESP32 nodes (Arduino Nano ESP32, C++) read sensors, publish JSON over MQTT
-- **Middle:** Raspberry Pi 5 — hosts MQTT broker + SQLite database
+- **Middle:** Raspberry Pi 5 hosts MQTT broker + SQLite database
 - **Top:** Grafana dashboards reading from the database
 ## Repository Structure
  
