@@ -17,9 +17,14 @@ DB_PATH = "sensor_data.db"
 db_conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 db_cursor = db_conn.cursor()
 
-known_tables = set()     # tables already created this run
-buffered_rows = {}       # {device_id: [(temp, hum, ext, ts_ms), ...]}
+known_tables = {}        # {table_name: set(existing_column_names)}
+buffered_rows = {}       # {device_id: [ {col: value, ...}, ... ]}
 last_saved_at = {}       # {device_id: last flush timestamp}
+
+# Any key in the payload other than these is treated as a sensor reading.
+# This is what lets each message carry just one sensor, or two (e.g. the
+# combined temperature+humidity sensor), in any combination.
+RESERVED_KEYS = {"device_id", "timestamp_ms"}
 
 
 def safe_table_name(device_id):
@@ -27,35 +32,67 @@ def safe_table_name(device_id):
     return "device_" + "".join(c if c.isalnum() else "_" for c in device_id)
 
 
+def safe_column_name(key):
+    """Sanitize a sensor key into a valid SQLite column name."""
+    return "".join(c if c.isalnum() else "_" for c in key)
+
+
 def ensure_table(table_name):
-    """Creates the device's table if it doesn't exist yet."""
+    """Creates the device's table if it doesn't exist yet, and loads its
+    current column set so we know what's already there."""
     if table_name in known_tables:
         return
     db_cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS "{table_name}" (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            temperatureSensor_val INTEGER,
-            humiditySensor_val INTEGER,
-            extensometerSensor_val INTEGER,
             timestamp_ms INTEGER,
             received_at REAL DEFAULT (strftime('%s','now'))
         )
     """)
     db_conn.commit()
-    known_tables.add(table_name)
+    db_cursor.execute(f'PRAGMA table_info("{table_name}")')
+    existing_cols = {row[1] for row in db_cursor.fetchall()}
+    known_tables[table_name] = existing_cols
+
+
+def ensure_columns(table_name, keys):
+    """Adds any sensor columns that haven't been seen yet for this device."""
+    existing = known_tables[table_name]
+    for key in keys:
+        col = safe_column_name(key)
+        if col not in existing:
+            try:
+                db_cursor.execute(f'ALTER TABLE "{table_name}" ADD COLUMN "{col}" REAL')
+                db_conn.commit()
+                existing.add(col)
+                print(f"[SQLite] Added new column '{col}' to table '{table_name}'")
+            except sqlite3.OperationalError as e:
+                # Could happen if two new sensor names race each other; safe to ignore.
+                print(f"[Warn] Could not add column '{col}' to '{table_name}': {e}")
 
 
 def flush_device(device_id, table_name):
-    """Writes all buffered rows for a device to its table."""
+    """Writes all buffered rows for a device to its table.
+    Rows may have different sets of keys (different sensors reported at
+    different moments), so we build the column list as the union of keys
+    across the buffered rows and let missing values fall back to NULL."""
     rows = buffered_rows.get(device_id, [])
     if not rows:
         return
     try:
+        all_keys = set()
+        for r in rows:
+            all_keys.update(r.keys())
+        all_keys.discard("timestamp_ms")
+        col_names = ["timestamp_ms"] + sorted(all_keys)
+
+        col_list = ",".join(f'"{c}"' for c in col_names)
+        placeholders = ",".join(["?"] * len(col_names))
+        values = [tuple(r.get(c) for c in col_names) for r in rows]
+
         db_cursor.executemany(
-            f'INSERT INTO "{table_name}" '
-            f'(temperatureSensor_val, humiditySensor_val, extensometerSensor_val, timestamp_ms) '
-            f'VALUES (?, ?, ?, ?)',
-            rows
+            f'INSERT INTO "{table_name}" ({col_list}) VALUES ({placeholders})',
+            values
         )
         db_conn.commit()
         print(f"[SQLite] Wrote {len(rows)} row(s) to table '{table_name}'")
@@ -82,12 +119,16 @@ def on_message(client, userdata, msg):
         table_name = safe_table_name(device_id)
         ensure_table(table_name)
 
-        row = (
-            decoded_data.get("temperatureSensor_val"),
-            decoded_data.get("humiditySensor_val"),
-            decoded_data.get("extensometerSensor_val"),
-            decoded_data.get("timestamp_ms"),
-        )
+        # Whatever sensor keys are present in THIS message (could be 1, 2, or more)
+        sensor_keys = [k for k in decoded_data.keys() if k not in RESERVED_KEYS]
+        if not sensor_keys:
+            print(f"[Warn] Message from {device_id} had no sensor fields, skipping.")
+            return
+
+        ensure_columns(table_name, sensor_keys)
+
+        row = {safe_column_name(k): decoded_data.get(k) for k in sensor_keys}
+        row["timestamp_ms"] = decoded_data.get("timestamp_ms")
 
         buffered_rows.setdefault(device_id, [])
         buffered_rows[device_id].append(row)

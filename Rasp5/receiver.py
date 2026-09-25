@@ -5,7 +5,7 @@ import paho.mqtt.client as mqtt
 # --- Configuration ---
 BROKER_IP   = "127.0.0.1"  # "localhost" if the broker script runs on the same Pi 5 ( it usually does )
 BROKER_PORT = 1883
-MQTT_TOPIC  = "esp32/sensors"
+MQTT_TOPIC  = "esp32/sensorReadings"
 
 # --- In-Memory Storage Array ---
 sensor_data_history = []
