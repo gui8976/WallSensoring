@@ -6,10 +6,8 @@ Lightweight SHM pipeline for a wall: ESP32 nodes collect temperature, humidity, 
  
 ## Architecture
  
-```
-[ ESP32 + sensors ]  --MQTT-->  [ Raspberry Pi 5: broker + database ]  -->  [ Grafana / HMI ]
-   bottom layer                         middle layer                        top layer
-```
+<img width="2488" height="2168" alt="system_architecture" src="https://github.com/user-attachments/assets/b3358661-8764-4faa-8033-7947e77a12dd" />
+
  
 - **Bottom:** ESP32 nodes (Arduino Nano ESP32, C++) read sensors, publish JSON over MQTT
 - **Middle:** Raspberry Pi 5 hosts MQTT broker + SQLite database
@@ -26,5 +24,3 @@ WallSensoring/
 └── sensorArduino/       # Individual sensor test sketches
 ```
  
-## Status
-Active work-in-progress, part of an ongoing SHM research project.
