@@ -1,7 +1,6 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <DHT.h>
-#include <math.h>
 
 // ==============================================================================
 // CONFIGURATION
@@ -23,13 +22,13 @@ const char* CLIENT_ID     = "ESP32_right";  // Must be unique per ESP32
 // SENSOR SETUP — this board carries 3 physical sensors:
 //   1) SEN0114 - Analog Soil Moisture Sensor
 //   2) KY-015  - DHT11 Temperature + Humidity module (digital, single-wire)
-//   3) KY-013  - NTC Thermistor Temperature module (analog)
+//   3) LM35    - DFRobot LM35 Temperature Sensor V4 (analog, 10 mV/°C)
 // Pin names are the Nano ESP32's own labels (D2, A0, A1) - A0/A1 sit on
 // ADC1, which stays reliable while Wi-Fi is active.
 // ==============================================================================
-const int PIN_MOISTURE   = A0;  // SEN0114 - analog pin (ADC1)
-const int PIN_DHT        = D2;  // KY-015 - digital data pin
-const int PIN_THERMISTOR = A1;  // KY-013 - analog pin (ADC1)
+const int PIN_MOISTURE = A0;  // SEN0114 - analog pin (ADC1)
+const int PIN_DHT      = D2;  // KY-015  - digital data pin
+const int PIN_LM35     = A1;  // LM35    - analog pin (ADC1)
 
 #define DHTTYPE DHT11
 DHT dht(PIN_DHT, DHTTYPE);
@@ -41,42 +40,37 @@ unsigned long lastPublish = 0;
 const unsigned long PUBLISH_INTERVAL = 5000; // 5 seconds
 
 // ==============================================================================
-// SENSOR CALIBRATION / CONVERSION CONSTANTS
-// ==============================================================================
-const float ADC_MAX  = 4095.0;   // 12-bit ADC resolution
-const float ADC_VREF = 3.3;      // ESP32 ADC reference voltage
-
-// SEN0114 moisture sensor - calibrate for YOUR sensor: dip in dry air, note
-// the raw analogRead() value, then dip in a cup of water and note that one.
-const int MOISTURE_AIR_VALUE   = 3000; // raw ADC reading in dry air  -> 0%
-const int MOISTURE_WATER_VALUE = 1200; // raw ADC reading in water    -> 100%
-
-// KY-013 thermistor - matches the module's onboard 10k series resistor and
-// standard Steinhart-Hart coefficients (same as DFRobot/Joy-IT reference code)
-const float THERMISTOR_R1 = 10000.0;
-const float SH_C1 = 0.001129148;
-const float SH_C2 = 0.000234125;
-const float SH_C3 = 0.0000000876741;
-
-// ==============================================================================
-// CONVERSION HELPERS
+// SENSOR CALIBRATION CONSTANTS
 // ==============================================================================
 
-// SEN0114 raw ADC -> soil moisture percentage (needs the calibration above)
-float rawToMoisturePercent(int rawADC) {
-  float pct = map(rawADC, MOISTURE_AIR_VALUE, MOISTURE_WATER_VALUE, 0, 100);
-  if (pct < 0)   pct = 0;
-  if (pct > 100) pct = 100;
-  return pct;
+// SEN0114 moisture sensor (raw 12-bit ADC values)
+const int DRY_VALUE = 0;      // sensor in air   -> 0%
+const int WET_VALUE = 3000;   // sensor in water -> 100%
+
+// LM35 temperature sensor
+const int   LM35_SAMPLES   = 32;   // readings averaged per measurement
+const float LM35_OFFSET_C  = 0.0;  // correction vs. a reference thermometer
+
+// ==============================================================================
+// SENSOR READING FUNCTIONS
+// ==============================================================================
+
+// SEN0114: raw ADC -> 0-100 % (dry = low, wet = high)
+int readMoisturePercent() {
+  int rawValue = analogRead(PIN_MOISTURE);
+  int percent = map(rawValue, DRY_VALUE, WET_VALUE, 0, 100);
+  return constrain(percent, 0, 100);
 }
 
-// KY-013 raw ADC -> temperature in Celsius via Steinhart-Hart equation
-float rawToThermistorCelsius(int rawADC) {
-  if (rawADC <= 0) rawADC = 1; // avoid divide-by-zero
-  float r2 = THERMISTOR_R1 * ((ADC_MAX / (float)rawADC) - 1.0);
-  float logR2 = log(r2);
-  float tempK = 1.0 / (SH_C1 + SH_C2 * logR2 + SH_C3 * logR2 * logR2 * logR2);
-  return tempK - 273.15;
+// LM35: averaged millivolts -> °C (10 mV per °C)
+float readLM35Celsius() {
+  long sumMv = 0;
+  for (int i = 0; i < LM35_SAMPLES; i++) {
+    sumMv += analogReadMilliVolts(PIN_LM35);
+    delay(2);
+  }
+  float mV = sumMv / (float)LM35_SAMPLES;
+  return mV / 10.0 + LM35_OFFSET_C;
 }
 
 // ==============================================================================
@@ -118,13 +112,14 @@ void connectMQTT() {
 
 void setup() {
   Serial.begin(9600);
-  while (!Serial) {
-    ; // Wait for the serial port to connect
+  unsigned long t0 = millis();
+  while (!Serial && millis() - t0 < 3000) {
+    ; // Wait up to 3 s for the serial port, so the board also runs without USB
   }
-  Serial.println("Hello, world!");
-  Serial.println("[System]");
-  analogReadResolution(12); // 0-4095
+  Serial.println("[System] Starting...");
 
+  analogReadResolution(12); // 0-4095
+  pinMode(PIN_MOISTURE, INPUT);
   dht.begin();
 
   connectWiFi();
@@ -168,20 +163,16 @@ void loop() {
   if (now - lastPublish >= PUBLISH_INTERVAL) {
     lastPublish = now;
 
-    // Step A: Read raw / sensor-native values
-    int moistureRaw = analogRead(PIN_MOISTURE);       // SEN0114: 0-4095
-    float dhtHumidity = dht.readHumidity();           // KY-015: %RH
-    float dhtTemp = dht.readTemperature();             // KY-015: °C
-    int thermistorRaw = analogRead(PIN_THERMISTOR);   // KY-013: 0-4095
+    // Step A: Read the 3 sensors (already converted to final units)
+    int   moisturePct = readMoisturePercent();   // 0-100 %
+    float dhtHumidity = dht.readHumidity();      // %RH
+    float dhtTemp     = dht.readTemperature();   // °C
+    float lm35C       = readLM35Celsius();       // °C
 
-    // Step B: Convert to real-world units
-    float moisturePct = rawToMoisturePercent(moistureRaw);
-    float thermistorC = rawToThermistorCelsius(thermistorRaw);
-
-    // Step C: Publish each reading as its own message (same timestamp for the cycle)
+    // Step B: Publish each reading as its own message (same timestamp for the cycle)
     publishReading("moistureSensor_pct", moisturePct, now);
 
-    // DHT11 reads can occasionally fail (returns NaN) 
+    // DHT11 reads can occasionally fail (returns NaN)
     if (!isnan(dhtHumidity)) {
       publishReading("dhtHumidity_pct", dhtHumidity, now);
     } else {
@@ -193,6 +184,7 @@ void loop() {
       Serial.println("[Warn] DHT11 temperature read failed, skipping.");
     }
 
-    publishReading("thermistorTemperature_c", thermistorC, now);
+    // Key name kept as in the old sketch so the broker/database/Grafana keep working
+    publishReading("thermistorTemperature_c", lm35C, now);
   }
 }

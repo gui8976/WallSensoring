@@ -28,8 +28,6 @@ const int PIN_TILT      = D2;  // DFR0028 - digital pin, HIGH/LOW
 const int PIN_LIGHT     = A0;  // DFR0026 - analog pin (ADC1)
 const int PIN_MOISTURE  = A1;  // SEN0114 - analog pin (ADC1)
 
-
-
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -37,39 +35,44 @@ unsigned long lastPublish = 0;
 const unsigned long PUBLISH_INTERVAL = 5000; // 5 seconds
 
 // ==============================================================================
-// SENSOR CALIBRATION / CONVERSION CONSTANTS
-// ==============================================================================
-const float ADC_MAX  = 4095.0;   // 12-bit ADC resolution (matches analogReadResolution(12))
-const float ADC_VREF = 3.3;      // ESP32 ADC reference voltage
-
-// SEN0114 moisture sensor
-const int MOISTURE_AIR_VALUE   = 3000; // raw ADC reading in dry air  -> 0%
-const int MOISTURE_WATER_VALUE = 1200; // raw ADC reading in water    -> 100%
-
-// DFR0026 light sensor - DFRobot gives no official lux formula 
-const float LIGHT_GAMMA = 0.7;
-const float LIGHT_RL10  = 50.0;
-
-// ==============================================================================
-// CONVERSION HELPERS
+// SENSOR CALIBRATION CONSTANTS
 // ==============================================================================
 
-// DFR0026 raw ADC -> approximate lux
-float rawToLux(int rawADC) {
-  float voltage = rawADC / ADC_MAX * ADC_VREF;
-  if (voltage <= 0.0) voltage = 0.001;               // avoid divide-by-zero
-  if (voltage >= ADC_VREF) voltage = ADC_VREF - 0.001;
-  float resistance = 2000.0 * voltage / (ADC_VREF - voltage);
-  float lux = pow(LIGHT_RL10 * 1e3 * pow(10, LIGHT_GAMMA) / resistance, (1.0 / LIGHT_GAMMA));
-  return lux;
+// SEN0114 moisture sensor (raw 12-bit ADC values)
+const int DRY_VALUE = 0;      // sensor in air   -> 0%
+const int WET_VALUE = 3000;   // sensor in water -> 100%
+
+// DFR0026 light sensor (millivolts)
+const int NUM_SAMPLES = 16;   // readings averaged per measurement
+const int DARK_MV     = 100;  // sensor covered       -> 0%
+const int BRIGHT_MV   = 3000; // sensor in strong light -> 100%
+
+// ==============================================================================
+// SENSOR READING FUNCTIONS
+// ==============================================================================
+
+// SEN0114: raw ADC -> 0-100 % (dry = low, wet = high)
+int readMoisturePercent() {
+  int rawValue = analogRead(PIN_MOISTURE);
+  int percent = map(rawValue, DRY_VALUE, WET_VALUE, 0, 100);
+  return constrain(percent, 0, 100);
 }
 
-// SEN0114 raw ADC -> soil moisture percentage (needs the calibration above)
-float rawToMoisturePercent(int rawADC) {
-  float pct = map(rawADC, MOISTURE_AIR_VALUE, MOISTURE_WATER_VALUE, 0, 100);
-  if (pct < 0)   pct = 0;
-  if (pct > 100) pct = 100;
-  return pct;
+// DFR0026: averaged millivolts -> 0-100 % (relative light level, not lux)
+int readLightPercent() {
+  long sumMv = 0;
+  for (int i = 0; i < NUM_SAMPLES; i++) {
+    sumMv += analogReadMilliVolts(PIN_LIGHT);
+    delay(2);
+  }
+  int mV = sumMv / NUM_SAMPLES;
+  int percent = map(mV, DARK_MV, BRIGHT_MV, 0, 100);
+  return constrain(percent, 0, 100);
+}
+
+// DFR0028: 0 or 1
+int readTilt() {
+  return digitalRead(PIN_TILT);
 }
 
 // ==============================================================================
@@ -111,13 +114,13 @@ void connectMQTT() {
 
 void setup() {
   Serial.begin(9600);
-  while (!Serial) {
-    ; // Wait for the serial port to connect
+  unsigned long t0 = millis();
+  while (!Serial && millis() - t0 < 3000) {
+    ; // Wait up to 3 s for the serial port, so the board also runs without USB
   }
-  Serial.println("Hello, world!");
-  Serial.println("[System]");
-  analogReadResolution(12); // 0-4095, matches MicroPython's default ADC range
+  Serial.println("[System] Starting...");
 
+  analogReadResolution(12); // 0-4095
   pinMode(PIN_TILT, INPUT);
 
   connectWiFi();
@@ -161,18 +164,14 @@ void loop() {
   if (now - lastPublish >= PUBLISH_INTERVAL) {
     lastPublish = now;
 
-    // Step A: Read raw values from this board's 3 sensors
-    int tiltRaw     = digitalRead(PIN_TILT);      // DFR0028: 0 or 1, already meaningful
-    int lightRaw    = analogRead(PIN_LIGHT);      // DFR0026: 0-4095
-    int moistureRaw = analogRead(PIN_MOISTURE);   // SEN0114: 0-4095
+    // Step A: Read the 3 sensors (already converted to final units)
+    int tilt        = readTilt();             // 0 or 1
+    int lightPct    = readLightPercent();     // 0-100 %
+    int moisturePct = readMoisturePercent();  // 0-100 %
 
-    // Step B: Convert to real-world units
-    float lightLux    = rawToLux(lightRaw);
-    float moisturePct = rawToMoisturePercent(moistureRaw);
-
-    // Step C: Publish each reading as its own message (same timestamp for the cycle)
-    publishReading("tiltSensor", tiltRaw, now);
-    publishReading("lightSensor", lightLux, now);
+    // Step B: Publish each reading as its own message (same timestamp for the cycle)
+    publishReading("tiltSensor", tilt, now);
+    publishReading("lightSensor", lightPct, now);
     publishReading("moistureSensor", moisturePct, now);
   }
 }
