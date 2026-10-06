@@ -1,0 +1,792 @@
+{
+  "uid": "sensor-db-evolution",
+  "title": "Sensor DB — Evolution over time",
+  "schemaVersion": 39,
+  "version": 3,
+  "editable": true,
+  "timezone": "browser",
+  "refresh": "30s",
+  "tags": [
+    "sqlite",
+    "esp32",
+    "sensors"
+  ],
+  "time": {
+    "from": "now-48h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "ds",
+        "label": "SQLite datasource",
+        "type": "datasource",
+        "query": "frser-sqlite-datasource",
+        "current": {},
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Database overview",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Total rows — ESP32_left",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${ds}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 4,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT COUNT(*) AS \"rows\" FROM \"device_ESP32_left\"",
+          "rawQueryText": "SELECT COUNT(*) AS \"rows\" FROM \"device_ESP32_left\"",
+          "queryType": "table"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Total rows — ESP32_right",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${ds}"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 1,
+        "w": 4,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT COUNT(*) AS \"rows\" FROM \"device_ESP32_right\"",
+          "rawQueryText": "SELECT COUNT(*) AS \"rows\" FROM \"device_ESP32_right\"",
+          "queryType": "table"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Database growth (cumulative rows)",
+      "description": "Running total of rows per device table.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${ds}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 16,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT * FROM (WITH b AS (SELECT CAST(received_at/60 AS INT)*60 AS time, COUNT(*) AS c FROM \"device_ESP32_left\" GROUP BY 1) SELECT time, SUM(c) OVER (ORDER BY time) AS \"ESP32_left\" FROM b) WHERE time BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY time",
+          "rawQueryText": "SELECT * FROM (WITH b AS (SELECT CAST(received_at/60 AS INT)*60 AS time, COUNT(*) AS c FROM \"device_ESP32_left\" GROUP BY 1) SELECT time, SUM(c) OVER (ORDER BY time) AS \"ESP32_left\" FROM b) WHERE time BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY time",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT * FROM (WITH b AS (SELECT CAST(received_at/60 AS INT)*60 AS time, COUNT(*) AS c FROM \"device_ESP32_right\" GROUP BY 1) SELECT time, SUM(c) OVER (ORDER BY time) AS \"ESP32_right\" FROM b) WHERE time BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY time",
+          "rawQueryText": "SELECT * FROM (WITH b AS (SELECT CAST(received_at/60 AS INT)*60 AS time, COUNT(*) AS c FROM \"device_ESP32_right\" GROUP BY 1) SELECT time, SUM(c) OVER (ORDER BY time) AS \"ESP32_right\" FROM b) WHERE time BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY time",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "row",
+      "title": "ESP32_left",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 8,
+      "type": "state-timeline",
+      "title": "Tilt (digital 0 / 1)",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${ds}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 8,
+        "h": 7
+      },
+      "description": "Digital tilt sensor: 0 or 1.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT received_at AS time, tiltSensor AS \"tilt\" FROM \"device_ESP32_left\" WHERE tiltSensor IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "rawQueryText": "SELECT received_at AS time, tiltSensor AS \"tilt\" FROM \"device_ESP32_left\" WHERE tiltSensor IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "0",
+                  "color": "green",
+                  "index": 0
+                },
+                "1": {
+                  "text": "1",
+                  "color": "red",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mergeValues": true,
+        "showValue": "auto",
+        "alignValue": "center",
+        "rowHeight": 0.8,
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Light (relative %)",
+      "description": "DFR0026 ambient light, relative 0-100 % (not lux).",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${ds}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 8,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT received_at AS time, lightSensor_pct AS \"light\" FROM \"device_ESP32_left\" WHERE lightSensor_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "rawQueryText": "SELECT received_at AS time, lightSensor_pct AS \"light\" FROM \"device_ESP32_left\" WHERE lightSensor_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Moisture",
+      "description": "SEN0114 soil moisture, 0-100 %.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${ds}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 8,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT received_at AS time, moistureSensor_pct AS \"moisture\" FROM \"device_ESP32_left\" WHERE moistureSensor_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "rawQueryText": "SELECT received_at AS time, moistureSensor_pct AS \"moisture\" FROM \"device_ESP32_left\" WHERE moistureSensor_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "ESP32_left — all sensor values",
+      "description": "All sensors together. Light and moisture are % (0-100); tilt is drawn as a 0/1 step line.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${ds}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT received_at AS time, tiltSensor AS \"tilt\" FROM \"device_ESP32_left\" WHERE tiltSensor IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "rawQueryText": "SELECT received_at AS time, tiltSensor AS \"tilt\" FROM \"device_ESP32_left\" WHERE tiltSensor IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT received_at AS time, lightSensor_pct AS \"light\" FROM \"device_ESP32_left\" WHERE lightSensor_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "rawQueryText": "SELECT received_at AS time, lightSensor_pct AS \"light\" FROM \"device_ESP32_left\" WHERE lightSensor_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT received_at AS time, moistureSensor_pct AS \"moisture\" FROM \"device_ESP32_left\" WHERE moistureSensor_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "rawQueryText": "SELECT received_at AS time, moistureSensor_pct AS \"moisture\" FROM \"device_ESP32_left\" WHERE moistureSensor_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "percent"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tilt"
+            },
+            "properties": [
+              {
+                "id": "custom.lineInterpolation",
+                "value": "stepAfter"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "ESP32_right",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Humidity (DHT11)",
+      "description": "",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${ds}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT received_at AS time, dhtHumidity_pct AS \"humidity\" FROM \"device_ESP32_right\" WHERE dhtHumidity_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "rawQueryText": "SELECT received_at AS time, dhtHumidity_pct AS \"humidity\" FROM \"device_ESP32_right\" WHERE dhtHumidity_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "humidity",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Moisture",
+      "description": "",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${ds}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 25,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT received_at AS time, moistureSensor_pct AS \"moisture\" FROM \"device_ESP32_right\" WHERE moistureSensor_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "rawQueryText": "SELECT received_at AS time, moistureSensor_pct AS \"moisture\" FROM \"device_ESP32_right\" WHERE moistureSensor_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Temperature (DHT11 vs LM35)",
+      "description": "KY-015 (DHT11) and DFRobot LM35 side by side.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${ds}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 25,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT received_at AS time, dhtTemperature_c AS \"DHT11 temperature\" FROM \"device_ESP32_right\" WHERE dhtTemperature_c IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "rawQueryText": "SELECT received_at AS time, dhtTemperature_c AS \"DHT11 temperature\" FROM \"device_ESP32_right\" WHERE dhtTemperature_c IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT received_at AS time, lm35Temperature_c AS \"LM35 temperature\" FROM \"device_ESP32_right\" WHERE lm35Temperature_c IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "rawQueryText": "SELECT received_at AS time, lm35Temperature_c AS \"LM35 temperature\" FROM \"device_ESP32_right\" WHERE lm35Temperature_c IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "celsius"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "ESP32_right — all sensor values",
+      "description": "All sensors together: humidity and moisture in %, temperatures in °C (right axis).",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "${ds}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT received_at AS time, dhtHumidity_pct AS \"humidity\" FROM \"device_ESP32_right\" WHERE dhtHumidity_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "rawQueryText": "SELECT received_at AS time, dhtHumidity_pct AS \"humidity\" FROM \"device_ESP32_right\" WHERE dhtHumidity_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT received_at AS time, moistureSensor_pct AS \"moisture\" FROM \"device_ESP32_right\" WHERE moistureSensor_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "rawQueryText": "SELECT received_at AS time, moistureSensor_pct AS \"moisture\" FROM \"device_ESP32_right\" WHERE moistureSensor_pct IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT received_at AS time, dhtTemperature_c AS \"DHT11 temperature\" FROM \"device_ESP32_right\" WHERE dhtTemperature_c IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "rawQueryText": "SELECT received_at AS time, dhtTemperature_c AS \"DHT11 temperature\" FROM \"device_ESP32_right\" WHERE dhtTemperature_c IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "${ds}"
+          },
+          "queryText": "SELECT received_at AS time, lm35Temperature_c AS \"LM35 temperature\" FROM \"device_ESP32_right\" WHERE lm35Temperature_c IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "rawQueryText": "SELECT received_at AS time, lm35Temperature_c AS \"LM35 temperature\" FROM \"device_ESP32_right\" WHERE lm35Temperature_c IS NOT NULL AND received_at BETWEEN ($__from / 1000) AND ($__to / 1000) ORDER BY 1",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "percent"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*temperature"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "celsius"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    }
+  ]
+}
