@@ -7,12 +7,16 @@
 // ==============================================================================
 
 // Wi-Fi Credentials
-const char* WIFI_SSID     = "SYSTEC-FoF_Collab";
-const char* WIFI_PASSWORD = "XXXXX";
+const char* WIFI_SSID     = "Gui's Pixel 9";
+const char* WIFI_PASSWORD = "gaiusjullius";
 
 // MQTT Broker Settings (PC/Pi IP running broker.py)
-const char* MQTT_SERVER   = "10.227.18.51";
+const char* MQTT_SERVER   = "10.40.31.167";
 const int   MQTT_PORT     = 1883;
+
+const char* MQTT_USER     = nullptr;
+const char* MQTT_PASS     = nullptr;
+
 
 // Topics & Identifiers
 const char* MQTT_TOPIC    = "esp32/sensorReadings";
